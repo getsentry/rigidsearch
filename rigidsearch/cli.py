@@ -105,12 +105,33 @@ def search_cmd(ctx, query, section, index_path):
 
 
 @cli.command('devserver')
-@click.option('--bind', default='127.0.0.1')
-@click.option('--port', default=5001)
+@click.option('--bind', '-b', default='127.0.0.1:5001')
 @pass_ctx
-def devserver_cmd(ctx, bind, port):
-    """Runs the API server locally."""
-    ctx.app.run(bind, port, debug=True)
+def devserver_cmd(ctx, bind):
+    """Runs a local development server."""
+    parts = bind.split(':', 1)
+    if len(parts) == 2:
+        addr, port = parts
+    elif len(parts) == 1:
+        addr, port = bind, '5001'
+    if addr == '':
+        addr = '127.0.0.1'
+    ctx.app.run(addr, int(port), debug=True)
 
 
-main = cli
+@cli.command('run')
+@click.option('--bind', '-b', default='127.0.0.1:5001')
+@click.option('--workers', '-w', default=1)
+@click.option('--timeout', '-t', default=30)
+@click.option('--loglevel', default='info')
+@click.option('--accesslog', default='-')
+@click.option('--errorlog', default='-')
+@pass_ctx
+def run_cmd(ctx, **options):
+    """Runs the http web server."""
+    from rigidsearch.app import RigidsearchServer
+    RigidsearchServer(app=ctx.app, options=options).run()
+
+
+def main():
+    cli(auto_envvar_prefix='RIGIDSEARCH')

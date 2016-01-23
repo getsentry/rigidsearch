@@ -20,6 +20,8 @@ setup(
         'html5lib',
         'lxml',
         'cssselect',
+        'gunicorn',
+        'gevent',
     ],
     classifiers=[
         'Environment :: Web Environment',
