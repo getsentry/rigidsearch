@@ -29,7 +29,6 @@ def make_processor_from_config(config):
         title_cleanup_regex=config.get('PROCESSOR_TITLE_CLEANUP_REGEX'),
         content_selectors=config.get('PROCESSOR_CONTENT_SELECTORS'),
         ignore=config.get('PROCESSOR_IGNORE'),
-        ignored_tags=config.get('PROCESSOR_IGNORED_TAGS'),
     )
 
 
@@ -38,20 +37,19 @@ class Processor(object):
     def __init__(self, title_cleanup_regex=None,
                  content_selectors=None,
                  ignore=None,
-                 ignored_tags=None):
+                 no_default_ignores=False):
         self.content_selectors = [compile_selector(sel) for sel in
                                   content_selectors or ('body',)]
         if title_cleanup_regex is not None:
-            title_cleanup_regex = re.compile(title_cleanup_regex)
+            title_cleanup_regex = re.compile(
+                title_cleanup_regex.decode('unicode-escape'), re.UNICODE)
         self.title_cleanup_regex = title_cleanup_regex
-        self.ignore = [compile_selector(sel) for sel
-                       in ignore or ('.nocontent',)]
-        self.ignored_tags = list(ignored_tags
-                                 or ('script', 'noscript', 'style', 'head'))
+        self.ignore = [compile_selector(sel) for sel in ignore or ()]
+        if not self.ignore and not no_default_ignores:
+            self.ignore = [compile_selector(sel) for sel
+                           in ['script', 'noscript', 'style', '.nocontent']]
 
     def is_ignored(self, node):
-        if node.tag in self.ignored_tags:
-            return True
         for sel in self.ignore:
             xpath = sel.path.replace('descendant-or-self::', 'self::')
             matches = node.xpath(xpath)

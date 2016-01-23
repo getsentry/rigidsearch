@@ -31,15 +31,36 @@ def cli(ctx, config):
 @cli.command('index-folder')
 @click.argument('path', type=click.Path())
 @click.option('--section', default='generic')
+@click.option('--ignore', '-i', multiple=True,
+              help='Adds a CSS selector to be ignored for indexing.')
+@click.option('--no-default-ignores', is_flag=True,
+              help='Removes the default ignores.')
+@click.option('--content-selector', '-c', multiple=True,
+              help='Adds a content CSS selector.')
+@click.option('--title-cleanup-regex', '-T',
+              help='A regular expression for cleaning up the HTML title. The '
+              'group with index 1 is used for the final title.')
+@click.option('--skip-document', '-s',
+              help='Adds a document path that should be ignored.')
+@click.option('--index-path', help='Where to put the index.')
 @pass_ctx
-def index_folder_cmd(ctx, path, section):
+def index_folder_cmd(ctx, path, section, ignore, no_default_ignores,
+                     content_selector, title_cleanup_regex,
+                     skip_document, index_path):
     """Indexes a path."""
     from rigidsearch.search import get_index
     from rigidsearch.fs import find_all_documents, file_changed
-    index = get_index(ctx.app)
-    to_ignore = set(ctx.app.config.get('INDEXER_DOCS_TO_IGNORE', ()))
+    from rigidsearch.htmlprocessor import Processor
+    index = get_index(index_path, ctx.app)
 
-    all_docs = find_all_documents(path, ignore=to_ignore)
+    processor = Processor(
+        title_cleanup_regex=title_cleanup_regex,
+        content_selectors=content_selector,
+        ignore=ignore,
+        no_default_ignores=no_default_ignores
+    )
+
+    all_docs = find_all_documents(path, ignore=skip_document)
     to_delete = set()
     to_index = {}
     seen = set()
@@ -59,7 +80,7 @@ def index_folder_cmd(ctx, path, section):
     with index.transaction() as t:
         for path, source_file in to_index.iteritems():
             click.echo('Indexing %s' % path)
-            t.index_document(path, source_file, section=section)
+            t.index_document(processor, path, source_file, section=section)
         for path in to_delete:
             click.echo('Removing %s' % path)
             t.remove_document(path, section=section)
@@ -68,12 +89,13 @@ def index_folder_cmd(ctx, path, section):
 @cli.command('search')
 @click.argument('query')
 @click.option('--section', default='generic')
+@click.option('--index-path', help='Path to the search index.')
 @pass_ctx
-def search_cmd(ctx, query, section):
+def search_cmd(ctx, query, section, index_path):
     """Triggers a search from the command line."""
     from rigidsearch.search import get_index
 
-    index = get_index(ctx.app)
+    index = get_index(index_path, ctx.app)
     results = index.search(query, section=section)
     for result in results['items']:
         click.echo('%s (%s)' % (

@@ -10,7 +10,6 @@ from whoosh.highlight import HtmlFormatter, ContextFragmenter
 
 from flask import current_app
 
-from rigidsearch.htmlprocessor import make_processor_from_config
 from rigidsearch.utils import normalize_text
 
 
@@ -38,17 +37,18 @@ def make_schema():
     )
 
 
-def get_index(app=None):
-    if app is None:
-        app = current_app._get_current_object()
-    schema = make_schema()
-    path = app.config['SEARCH_INDEX_PATH']
-    if os.path.exists(path):
-        idx = index.open_dir(path)
+def get_index(index_path=None, app=None):
+    if index_path is None:
+        if app is None:
+            app = current_app._get_current_object()
+        schema = make_schema()
+        index_path = app.config['SEARCH_INDEX_PATH']
+    if os.path.exists(index_path):
+        idx = index.open_dir(index_path)
     else:
-        os.makedirs(path)
-        idx = index.create_in(path, schema)
-    return Index(app, idx, schema)
+        os.makedirs(index_path)
+        idx = index.create_in(index_path, schema)
+    return Index(index_path, idx, schema)
 
 
 class IndexTransaction(object):
@@ -63,7 +63,7 @@ class IndexTransaction(object):
             return rv
         raise RuntimeError('Tranaction was not started')
 
-    def index_document(self, path, source, section='generic'):
+    def index_document(self, processor, path, source, section='generic'):
         buf = []
         h = hashlib.sha1()
         with open(source, 'rb') as f:
@@ -75,7 +75,7 @@ class IndexTransaction(object):
                 buf.append(chunk)
             contents = ''.join(buf)
 
-        parts = self._index.processor.process_document(contents)
+        parts = processor.process_document(contents)
         self.remove_document(path, section)
         self._writer.add_document(
             path=path,
@@ -117,11 +117,10 @@ class IndexTransaction(object):
 
 class Index(object):
 
-    def __init__(self, app, whoosh_index, schema):
-        self.app = app
+    def __init__(self, index_path, whoosh_index, schema):
+        self.index_path = index_path
         self.whoosh_index = whoosh_index
         self.schema = schema
-        self.processor = make_processor_from_config(app.config)
 
     def transaction(self):
         return IndexTransaction(self)
@@ -144,8 +143,7 @@ class Index(object):
         h.update(path.encode('utf-8'))
         h.update('\x00')
         h.update(section.encode('utf-8'))
-        fn = os.path.join(self.app.config['SEARCH_INDEX_PATH'], 'content',
-                          h.hexdigest())
+        fn = os.path.join(self.index_path, 'content', h.hexdigest())
         return fn
 
     def get_content(self, path, section, normalize=True):
