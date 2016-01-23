@@ -25,7 +25,7 @@ def find_all_documents(base, ignore=None):
         dirnames[:] = [x for x in dirnames if x[:1] != '.']
         for filename in filenames:
             if filename.endswith('.html'):
-                full_filename = os.path.join(base, dirpath, filename)
+                full_filename = os.path.join(dirpath, filename)
                 path = filename_to_path(full_filename, base)
                 if not ignore or path not in ignore:
                     rv[path] = full_filename
