@@ -6,8 +6,7 @@ WORKDIR /usr/src/rigidsearch
 COPY . /usr/src/rigidsearch
 RUN pip install --no-cache-dir .[server]
 
-ENV RIGIDSEARCH_CONFIG=/usr/src/rigidsearch/config.py \
-    RIGIDSEARCH_SEARCH_INDEX_PATH=/var/lib/rigidsearch/index \
+ENV RIGIDSEARCH_SEARCH_INDEX_PATH=/var/lib/rigidsearch/index \
     RIGIDSEARCH_RUN_BIND=0.0.0.0:8000
 
 VOLUME /var/lib/rigidsearch
