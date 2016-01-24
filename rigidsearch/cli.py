@@ -1,6 +1,8 @@
 # coding: utf-8
 import os
 import click
+import shutil
+import tempfile
 
 from werkzeug.utils import cached_property
 
@@ -43,47 +45,65 @@ def cli(ctx, config):
 @click.option('--skip-document', '-s',
               help='Adds a document path that should be ignored.')
 @click.option('--index-path', help='Where to put the index.')
+@click.option('--save-zip', type=click.File('wb'),
+              help='Optional a zip file the index should be stored at.')
 @pass_ctx
 def index_folder_cmd(ctx, path, section, ignore, no_default_ignores,
                      content_selector, title_cleanup_regex,
-                     skip_document, index_path):
+                     skip_document, index_path, save_zip):
     """Indexes a path."""
-    from rigidsearch.search import get_index
+    from rigidsearch.search import get_index, zip_up_index
     from rigidsearch.fs import find_all_documents, file_changed
     from rigidsearch.htmlprocessor import Processor
-    index = get_index(index_path, ctx.app)
 
-    processor = Processor(
-        title_cleanup_regex=title_cleanup_regex,
-        content_selectors=content_selector,
-        ignore=ignore,
-        no_default_ignores=no_default_ignores
-    )
+    try:
+        if save_zip is not None:
+            index_path = tempfile.mkdtemp()
 
-    all_docs = find_all_documents(path, ignore=skip_document)
-    to_delete = set()
-    to_index = {}
-    seen = set()
+        index = get_index(index_path, ctx.app)
 
-    for doc in index.iter(section=section):
-        source_file = all_docs.get(doc['path'])
-        if source_file is None:
-            to_delete.add(doc['path'])
-        elif file_changed(source_file, doc['checksum']):
-            to_index[doc['path']] = source_file
-        seen.add(doc['path'])
+        processor = Processor(
+            title_cleanup_regex=title_cleanup_regex,
+            content_selectors=content_selector,
+            ignore=ignore,
+            no_default_ignores=no_default_ignores
+        )
 
-    for path, source_file in all_docs.iteritems():
-        if path not in seen:
-            to_index[path] = source_file
+        all_docs = find_all_documents(path, ignore=skip_document)
+        to_delete = set()
+        to_index = {}
+        seen = set()
 
-    with index.transaction() as t:
-        for path, source_file in to_index.iteritems():
-            click.echo('Indexing %s' % path)
-            t.index_document(processor, path, source_file, section=section)
-        for path in to_delete:
-            click.echo('Removing %s' % path)
-            t.remove_document(path, section=section)
+        for doc in index.iter(section=section):
+            source_file = all_docs.get(doc['path'])
+            if source_file is None:
+                to_delete.add(doc['path'])
+            elif file_changed(source_file, doc['checksum']):
+                to_index[doc['path']] = source_file
+            seen.add(doc['path'])
+
+        for path, source_file in all_docs.iteritems():
+            if path not in seen:
+                to_index[path] = source_file
+
+        with index.transaction() as t:
+            for path, source_file in to_index.iteritems():
+                click.echo('Indexing %s' % path)
+                t.index_document(processor, path, source_file, section=section)
+            for path in to_delete:
+                click.echo('Removing %s' % path)
+                t.remove_document(path, section=section)
+
+        if save_zip:
+            click.echo('Dumping index to zip file')
+            zip_up_index(save_zip, index_path)
+
+    finally:
+        if save_zip:
+            try:
+                shutil.rmtree(index_path)
+            except (OSError, IOError):
+                pass
 
 
 @cli.command('search')

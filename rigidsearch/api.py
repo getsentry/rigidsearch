@@ -1,6 +1,6 @@
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify, request, current_app, abort
 
-from rigidsearch.search import get_index
+from rigidsearch.search import get_index, put_index
 from rigidsearch.utils import cors
 
 
@@ -17,3 +17,11 @@ def search():
 
     return jsonify(get_index().search(
         q, section, page=page, per_page=per_page))
+
+
+@bp.route('/index', methods=['PUT'])
+def update_index():
+    if request.form.get('secret') != current_app.config['SEARCH_INDEX_SECRET']:
+        abort(403)
+    put_index(request.files['index'])
+    return jsonify(okay=True)

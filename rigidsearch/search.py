@@ -1,6 +1,9 @@
 # -*- coding: utf-8 -*-
 import os
+import uuid
 import errno
+import shutil
+import zipfile
 import hashlib
 from whoosh import index
 from whoosh.fields import Schema, TEXT, ID, STORED
@@ -37,18 +40,68 @@ def make_schema():
     )
 
 
-def get_index(index_path=None, app=None):
+def create_index_version(index_path):
+    path = os.path.join(index_path, uuid.uuid4().hex)
+    os.makedirs(path)
+    return path
+
+
+def get_index_path(index_path=None, app=None):
     if index_path is None:
         if app is None:
             app = current_app._get_current_object()
-        schema = make_schema()
         index_path = app.config['SEARCH_INDEX_PATH']
-    if os.path.exists(index_path):
-        idx = index.open_dir(index_path)
+    return index_path
+
+
+def get_index(index_path=None, app=None):
+    schema = make_schema()
+    index_path = get_index_path(index_path, app)
+
+    cur_idx = os.path.join(index_path, 'cur')
+
+    if os.path.exists(cur_idx):
+        idx = index.open_dir(cur_idx)
     else:
-        os.makedirs(index_path)
-        idx = index.create_in(index_path, schema)
-    return Index(index_path, idx, schema)
+        real_idx = create_index_version(index_path)
+        os.symlink(os.path.basename(real_idx), cur_idx)
+        idx = index.create_in(cur_idx, schema)
+    return Index(cur_idx, idx, schema)
+
+
+def put_index(stream, index_path=None, app=None):
+    """Replaces the index with a new version from a zip file that is
+    provided as file stream.
+    """
+    index_path = get_index_path(index_path, app)
+    cur_idx = os.path.join(index_path, 'cur')
+    index_name = os.path.join(index_path, os.readlink(cur_idx))
+
+    with zipfile.ZipFile(stream, 'r') as zip:
+        new_idx = create_index_version(index_path)
+        zip.extractall(new_idx)
+        tmp_cur_idx = os.path.join(index_path, '.cur-' +
+                                   os.path.basename(new_idx))
+        os.symlink(os.path.basename(new_idx), tmp_cur_idx)
+        os.rename(tmp_cur_idx, cur_idx)
+
+    try:
+        shutil.rmtree(index_name)
+    except OSError:
+        pass
+
+
+def zip_up_index(stream, index_path=None, app=None):
+    index_path = get_index_path(index_path, app)
+    base_dir = os.path.join(
+        index_path, os.readlink(os.path.join(index_path, 'cur')))
+
+    with zipfile.ZipFile(stream, 'w', zipfile.ZIP_DEFLATED) as zip:
+        for dirpath, dirnames, filenames in os.walk(base_dir):
+            for name in filenames:
+                path = os.path.join(dirpath, name)
+                arcname = path[len(base_dir) + 1:]
+                zip.write(path, arcname)
 
 
 class IndexTransaction(object):
