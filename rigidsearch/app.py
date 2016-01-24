@@ -1,8 +1,26 @@
+import os
 from flask import Flask
+
+
+env_config = [
+    ('SEARCH_INDEX_PATH', '/tmp/testindex'),
+    ('SEARCH_INDEX_SECRET', 'supersecretnotreallythough'),
+]
+
+
+def prime_config(config):
+    for key, default in env_config:
+        val = os.environ.get('RIGIDSEARCH_' + key)
+        if val is not None:
+            config[key] = val
+        elif default is not None:
+            config[key] = default
 
 
 def create_app(config_filename=None, config=None):
     app = Flask(__name__.split('.')[0])
+    prime_config(app.config)
+
     if config:
         app.config.update(config)
     if config_filename:
