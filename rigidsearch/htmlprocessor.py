@@ -24,14 +24,6 @@ def compile_selector(sel):
 tree_walker = html5lib.getTreeWalker('lxml')
 
 
-def make_processor_from_config(config):
-    return Processor(
-        title_cleanup_regex=config.get('PROCESSOR_TITLE_CLEANUP_REGEX'),
-        content_selectors=config.get('PROCESSOR_CONTENT_SELECTORS'),
-        ignore=config.get('PROCESSOR_IGNORE'),
-    )
-
-
 class Processor(object):
 
     def __init__(self, title_cleanup_regex=None,
@@ -41,13 +33,21 @@ class Processor(object):
         self.content_selectors = [compile_selector(sel) for sel in
                                   content_selectors or ('body',)]
         if title_cleanup_regex is not None:
-            title_cleanup_regex = re.compile(
-                title_cleanup_regex.decode('unicode-escape'), re.UNICODE)
+            title_cleanup_regex = re.compile(title_cleanup_regex, re.UNICODE)
         self.title_cleanup_regex = title_cleanup_regex
         self.ignore = [compile_selector(sel) for sel in ignore or ()]
         if not self.ignore and not no_default_ignores:
             self.ignore = [compile_selector(sel) for sel
                            in ['script', 'noscript', 'style', '.nocontent']]
+
+    @classmethod
+    def from_config(cls, config):
+        return cls(
+            title_cleanup_regex=config.get('title_cleanup_regex'),
+            content_selectors=config.get('content_selectors'),
+            ignore=config.get('ignore'),
+            no_default_ignores=config.get('no_default_ignores', False),
+        )
 
     def is_ignored(self, node):
         for sel in self.ignore:

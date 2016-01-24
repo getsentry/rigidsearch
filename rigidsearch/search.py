@@ -2,9 +2,11 @@
 import os
 import uuid
 import errno
+import click
 import shutil
 import zipfile
 import hashlib
+import tempfile
 from whoosh import index
 from whoosh.fields import Schema, TEXT, ID, STORED
 from whoosh.qparser import QueryParser
@@ -14,6 +16,8 @@ from whoosh.highlight import HtmlFormatter, ContextFragmenter
 from flask import current_app
 
 from rigidsearch.utils import normalize_text
+from rigidsearch.htmlprocessor import Processor
+from rigidsearch.fs import find_all_documents, file_changed
 
 
 context_fragmenter = ContextFragmenter(
@@ -242,3 +246,78 @@ class Index(object):
                 'page': page,
                 'per_page': per_page
             }
+
+
+class TreeIndexer(object):
+
+    def __init__(self, config, log=False):
+        self.configurations = config['configurations']
+        self.log_output = log
+
+    def log(self, message, *args):
+        if self.log_output:
+            click.echo(message % args)
+
+    def iter_sources(self):
+        for conf in self.configurations:
+            for source in conf['sources']:
+                d = dict(source)
+                d.update(conf)
+                d.pop('sources', None)
+                section = d.pop('section', None)
+                path = d.pop('path', None)
+                yield section, path, d
+
+    def index_source(self, index, section, path, config):
+        processor = Processor.from_config(config)
+        all_docs = find_all_documents(
+            path, ignore=config.get('skip_docs') or None)
+        to_delete = set()
+        to_index = {}
+        seen = set()
+
+        for doc in index.iter(section=section):
+            source_file = all_docs.get(doc['path'])
+            if source_file is None:
+                to_delete.add(doc['path'])
+            elif file_changed(source_file, doc['checksum']):
+                to_index[doc['path']] = source_file
+            seen.add(doc['path'])
+
+        for path, source_file in all_docs.iteritems():
+            if path not in seen:
+                to_index[path] = source_file
+
+        with index.transaction() as t:
+            for path, source_file in to_index.iteritems():
+                self.log('Indexing %s (%s)' % (
+                    click.style(path, fg='cyan'),
+                    click.style(section, fg='yellow')))
+                t.index_document(processor, path, source_file, section=section)
+            for path in to_delete:
+                self.log('Removing %s (%s)' % (
+                    click.style(path, fg='cyan'),
+                    click.style(section, fg='yellow')))
+                t.remove_document(path, section=section)
+
+    def index_tree(self, index_path=None, index_zip=None):
+        if index_zip is not None:
+            index_path = tempfile.mkdtemp()
+        elif index_path is None:
+            raise RuntimeError('Explicit index path must be provided')
+
+        index = get_index(index_path)
+
+        try:
+            for section, path, config in self.iter_sources():
+                self.index_source(index, section, path, config)
+            if index_zip is not None:
+                self.log('Dumping index into archive ...')
+                zip_up_index(index_zip, index_path)
+                self.log('Done')
+        finally:
+            if index_zip is not None:
+                try:
+                    shutil.rmtree(index_path)
+                except (OSError, IOError):
+                    pass
