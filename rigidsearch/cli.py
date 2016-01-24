@@ -149,8 +149,8 @@ def devserver_cmd(ctx, bind):
 @pass_ctx
 def run_cmd(ctx, **options):
     """Runs the http web server."""
-    from rigidsearch.app import RigidsearchServer
-    RigidsearchServer(app=ctx.app, options=options).run()
+    from rigidsearch.app import make_production_server
+    make_production_server(app=ctx.app, options=options).run()
 
 
 def main():

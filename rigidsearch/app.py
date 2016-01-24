@@ -1,5 +1,4 @@
 from flask import Flask
-from gunicorn.app.base import Application
 
 
 def create_app(config_filename=None, config=None):
@@ -15,23 +14,29 @@ def create_app(config_filename=None, config=None):
     return app
 
 
-class RigidsearchServer(Application):
-    def __init__(self, app, options):
-        # Non-optional gunicorn attributes
-        self.usage = None
-        self.prog = None
-        self.cfg = None
-        self.callable = None
+def make_production_server(app, options):
+    from gunicorn.app.base import Application
 
-        self._app = app
-        self._options = options
-        self.do_load_config()
+    class RigidsearchServer(Application):
 
-    def init(self, *args):
-        options = self._options.copy()
-        options['worker_class'] = 'gevent'
-        options['proc_name'] = 'rigidsearch'
-        return options
+        def __init__(self, app, options):
+            # Non-optional gunicorn attributes
+            self.usage = None
+            self.prog = None
+            self.cfg = None
+            self.callable = None
 
-    def load(self):
-        return self._app
+            self._app = app
+            self._options = options
+            self.do_load_config()
+
+        def init(self, *args):
+            options = self._options.copy()
+            options['worker_class'] = 'gevent'
+            options['proc_name'] = 'rigidsearch'
+            return options
+
+        def load(self):
+            return self._app
+
+    return RigidsearchServer(app, options)

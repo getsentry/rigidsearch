@@ -20,9 +20,10 @@ setup(
         'html5lib',
         'lxml',
         'cssselect',
-        'gunicorn',
-        'gevent',
     ],
+    extras_require={
+        'server': ['gunicorn', 'gevent'],
+    },
     classifiers=[
         'Environment :: Web Environment',
         'Intended Audience :: Developers',
