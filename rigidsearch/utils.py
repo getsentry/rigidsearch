@@ -1,4 +1,5 @@
 import re
+from cStringIO import StringIO as BytesIO
 from datetime import timedelta
 from functools import update_wrapper
 from flask import make_response, current_app, request
@@ -64,3 +65,10 @@ def cors(origin=None, methods=None, headers=None, max_age=21600,
         f.provide_automatic_options = False
         return update_wrapper(wrapped_function, f)
     return decorator
+
+
+def release_file(request, name):
+    f = request.files[name]
+    rv = f.stream
+    f.stream = BytesIO()
+    return rv

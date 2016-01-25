@@ -1,11 +1,10 @@
-from cStringIO import StringIO
 from flask import Blueprint, jsonify, request, current_app, abort, json, \
      Response
 from werkzeug.security import safe_str_cmp
 
 from rigidsearch.search import get_index, put_index, index_tree, \
      get_index_path
-from rigidsearch.utils import cors
+from rigidsearch.utils import cors, release_file
 
 
 bp = Blueprint('api', __name__, url_prefix='/api')
@@ -43,9 +42,7 @@ def process_zip_for_index():
     index_path = get_index_path()
     config = json.load(request.files['config'])
 
-    f = request.files['archive']
-    archive = f.stream
-    f.stream = StringIO()
+    archive = release_file(request, 'archive')
 
     def generate():
         for event in index_tree(config, from_zip=archive,
