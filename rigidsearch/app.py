@@ -57,6 +57,7 @@ def make_production_server(app, options):
             options = self._options.copy()
             options['worker_class'] = 'gevent'
             options['proc_name'] = 'rigidsearch'
+            options['timeout'] = 300
             return options
 
         def load(self):
