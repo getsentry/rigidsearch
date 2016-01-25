@@ -52,7 +52,9 @@ def create_index_version(index_path, copy=False):
             os.makedirs(os.path.dirname(path))
         except OSError:
             pass
-        shutil.copytree(os.path.join(index_path, 'cur'), path)
+        cur = os.path.join(index_path, os.readlink(
+            os.path.join(index_path, 'cur')))
+        shutil.copytree(cur, path)
     else:
         os.makedirs(path)
     return path
@@ -66,9 +68,10 @@ def get_index_path(index_path=None, app=None):
     return index_path
 
 
-def get_index(index_path=None, app=None):
+def get_index(index_path=None, resolve_cur=True):
     schema = make_schema()
-    index_path = get_index_path(index_path, app)
+    if not resolve_cur:
+        return Index(index_path, index.open_dir(index_path), schema)
 
     cur_idx = os.path.join(index_path, 'cur')
 
@@ -94,10 +97,9 @@ def place_new_index(index_path, copy=True):
         yield new_idx
     finally:
         if sys.exc_info()[2] is None:
-            tmp_cur_idx = os.path.join(index_path, '.cur-' +
-                                       os.path.basename(new_idx))
-            os.symlink(os.path.basename(new_idx), tmp_cur_idx)
-            os.rename(tmp_cur_idx, cur_idx)
+            tmp = cur_idx + '.' + uuid.uuid4().hex
+            os.symlink(os.path.basename(new_idx), tmp)
+            os.rename(tmp, cur_idx)
             to_remove = index_name
         else:
             to_remove = new_idx
@@ -107,11 +109,10 @@ def place_new_index(index_path, copy=True):
             pass
 
 
-def put_index(stream, index_path=None, app=None):
+def put_index(index_path, stream):
     """Replaces the index with a new version from a zip file that is
     provided as file stream.
     """
-    index_path = get_index_path(index_path, app)
     with place_new_index(index_path, copy=False) as new_idx:
         with zipfile.ZipFile(stream, 'r') as zip:
             zip.extractall(new_idx)
@@ -131,9 +132,7 @@ def zip_up_index(stream, index_path=None, app=None):
 
 
 def index_tree(config, index_zip=None, base_dir=None, index_path=None,
-               app=None, from_zip=None):
-    if index_zip is None:
-        index_path = get_index_path(index_path, app)
+               from_zip=None):
     if len(filter(None, (index_zip, index_path))) != 1:
         raise TypeError('Either index zip or index path must be passed')
 
@@ -360,8 +359,8 @@ class TreeIndexer(object):
                 pass
 
     def index_tree(self, index_path=None, index_zip=None):
-        with self._process(index_path, index_zip) as index_path:
-            index = get_index(index_path)
+        with self._process(index_path, index_zip) as load_path:
+            index = get_index(load_path, resolve_cur=False)
             for section, path, config in self.iter_sources():
                 for evt in self.index_source(index, section, path, config):
                     yield evt

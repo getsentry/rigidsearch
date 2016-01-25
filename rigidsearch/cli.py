@@ -37,9 +37,10 @@ def cli(ctx, config):
 @pass_ctx
 def index_folder_cmd(ctx, config, save_zip):
     """Indexes a path."""
-    from rigidsearch.search import index_tree
+    from rigidsearch.search import index_tree, get_index_path
+    index_path = get_index_path(app=ctx.app)
     for event in index_tree(json.load(config), index_zip=save_zip,
-                            app=ctx.app):
+                            index_path=index_path):
         click.echo(event)
 
 
@@ -50,9 +51,10 @@ def index_folder_cmd(ctx, config, save_zip):
 @pass_ctx
 def search_cmd(ctx, query, section, index_path):
     """Triggers a search from the command line."""
-    from rigidsearch.search import get_index
+    from rigidsearch.search import get_index, get_index_path
 
-    index = get_index(index_path, ctx.app)
+    index_path = get_index_path(app=ctx.app)
+    index = get_index(index_path)
     results = index.search(query, section=section)
     for result in results['items']:
         click.echo('%s (%s)' % (

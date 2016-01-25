@@ -19,7 +19,8 @@ def search():
     per_page = request.args.get('per_page', type=int, default=20)
     section = request.args.get('section') or 'generic'
 
-    return jsonify(get_index().search(
+    index_path = get_index_path()
+    return jsonify(get_index(index_path).search(
         q, section, page=page, per_page=per_page))
 
 
@@ -28,7 +29,8 @@ def update_index():
     if not safe_str_cmp(request.form.get('secret', ''),
                         current_app.config['SEARCH_INDEX_SECRET']):
         abort(403)
-    put_index(request.files['archive'])
+    index_path = get_index_path()
+    put_index(index_path, request.files['archive'])
     return jsonify(okay=True)
 
 
