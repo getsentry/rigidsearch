@@ -15,11 +15,11 @@
       ],
       "sources": [
         {
-          "path": "../sentry-docs/build/dirhtml/hosted/",
+          "path": "dirhtml/hosted",
           "section": "hosted"
         },
         {
-          "path": "../sentry-docs/build/dirhtml/on-premise/",
+          "path": "dirhtml/on-premise",
           "section": "on-premise"
         }
       ]

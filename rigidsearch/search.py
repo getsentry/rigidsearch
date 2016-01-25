@@ -1,12 +1,13 @@
 # -*- coding: utf-8 -*-
 import os
+import sys
 import uuid
 import errno
-import click
 import shutil
 import zipfile
 import hashlib
 import tempfile
+from contextlib import contextmanager
 from whoosh import index
 from whoosh.fields import Schema, TEXT, ID, STORED
 from whoosh.qparser import QueryParser
@@ -44,9 +45,18 @@ def make_schema():
     )
 
 
-def create_index_version(index_path):
+def create_index_version(index_path=None, copy=False):
+    if index_path is None:
+        index_path = get_index_path()
     path = os.path.join(index_path, uuid.uuid4().hex)
-    os.makedirs(path)
+    if copy:
+        try:
+            os.makedirs(os.path.dirname(path))
+        except OSError:
+            pass
+        shutil.copytree(os.path.join(index_path, 'cur'), path)
+    else:
+        os.makedirs(path)
     return path
 
 
@@ -73,26 +83,40 @@ def get_index(index_path=None, app=None):
     return Index(cur_idx, idx, schema)
 
 
+@contextmanager
+def place_new_index(index_path, copy=True):
+    # Ensure the index exists
+    get_index(index_path)
+
+    cur_idx = os.path.join(index_path, 'cur')
+    index_name = os.path.join(index_path, os.readlink(cur_idx))
+
+    try:
+        new_idx = create_index_version(index_path, copy=copy)
+        yield new_idx
+    finally:
+        if sys.exc_info()[2] is not None:
+            tmp_cur_idx = os.path.join(index_path, '.cur-' +
+                                       os.path.basename(new_idx))
+            os.symlink(os.path.basename(new_idx), tmp_cur_idx)
+            os.rename(tmp_cur_idx, cur_idx)
+            to_remove = index_name
+        else:
+            to_remove = new_idx
+        try:
+            shutil.rmtree(to_remove)
+        except OSError:
+            pass
+
+
 def put_index(stream, index_path=None, app=None):
     """Replaces the index with a new version from a zip file that is
     provided as file stream.
     """
     index_path = get_index_path(index_path, app)
-    cur_idx = os.path.join(index_path, 'cur')
-    index_name = os.path.join(index_path, os.readlink(cur_idx))
-
-    with zipfile.ZipFile(stream, 'r') as zip:
-        new_idx = create_index_version(index_path)
-        zip.extractall(new_idx)
-        tmp_cur_idx = os.path.join(index_path, '.cur-' +
-                                   os.path.basename(new_idx))
-        os.symlink(os.path.basename(new_idx), tmp_cur_idx)
-        os.rename(tmp_cur_idx, cur_idx)
-
-    try:
-        shutil.rmtree(index_name)
-    except OSError:
-        pass
+    with place_new_index(index_path, copy=False) as new_idx:
+        with zipfile.ZipFile(stream, 'r') as zip:
+            zip.extractall(new_idx)
 
 
 def zip_up_index(stream, index_path=None, app=None):
@@ -106,6 +130,31 @@ def zip_up_index(stream, index_path=None, app=None):
                 path = os.path.join(dirpath, name)
                 arcname = path[len(base_dir) + 1:]
                 zip.write(path, arcname)
+
+
+def index_tree(config, index_zip=None, base_dir=None, index_path=None,
+               app=None, from_zip=None):
+    if index_zip is None:
+        index_path = get_index_path(index_path, app)
+    if len(filter(None, (index_zip, index_path))) != 1:
+        raise TypeError('Either index zip or index path must be passed')
+
+    if from_zip is not None:
+        source_tmp = tempfile.mkdtemp()
+        with zipfile.ZipFile(from_zip, 'r') as zip:
+            zip.extractall(source_tmp)
+            base_dir = source_tmp
+    try:
+        indexer = TreeIndexer(config, base_dir)
+        for evt in indexer.index_tree(index_path, index_zip):
+            yield evt
+        yield u'Done!'
+    finally:
+        if from_zip is not None:
+            try:
+                shutil.rmtree(source_tmp)
+            except (OSError, IOError):
+                pass
 
 
 class IndexTransaction(object):
@@ -250,13 +299,11 @@ class Index(object):
 
 class TreeIndexer(object):
 
-    def __init__(self, config, log=False):
+    def __init__(self, config, base_dir=None):
+        if base_dir is None:
+            base_dir = os.getcwd()
         self.configurations = config['configurations']
-        self.log_output = log
-
-    def log(self, message, *args):
-        if self.log_output:
-            click.echo(message % args)
+        self.base_dir = base_dir
 
     def iter_sources(self):
         for conf in self.configurations:
@@ -265,13 +312,14 @@ class TreeIndexer(object):
                 d.update(conf)
                 d.pop('sources', None)
                 section = d.pop('section', None)
-                path = d.pop('path', None)
+                path = os.path.join(self.base_dir, d.pop('path', None))
                 yield section, path, d
 
     def index_source(self, index, section, path, config):
         processor = Processor.from_config(config)
         all_docs = find_all_documents(
             path, ignore=config.get('skip_docs') or None)
+
         to_delete = set()
         to_index = {}
         seen = set()
@@ -290,34 +338,32 @@ class TreeIndexer(object):
 
         with index.transaction() as t:
             for path, source_file in to_index.iteritems():
-                self.log('Indexing %s (%s)' % (
-                    click.style(path, fg='cyan'),
-                    click.style(section, fg='yellow')))
+                yield 'Indexing %s (%s)' % (path, section)
                 t.index_document(processor, path, source_file, section=section)
             for path in to_delete:
-                self.log('Removing %s (%s)' % (
-                    click.style(path, fg='cyan'),
-                    click.style(section, fg='yellow')))
+                yield 'Removing %s (%s)' % (path, section)
                 t.remove_document(path, section=section)
 
-    def index_tree(self, index_path=None, index_zip=None):
-        if index_zip is not None:
-            index_path = tempfile.mkdtemp()
-        elif index_path is None:
-            raise RuntimeError('Explicit index path must be provided')
-
-        index = get_index(index_path)
-
+    @contextmanager
+    def _process(self, index_path, index_zip):
+        if index_zip is None:
+            with place_new_index(index_path, copy=True) as path:
+                yield path
+            return
         try:
-            for section, path, config in self.iter_sources():
-                self.index_source(index, section, path, config)
-            if index_zip is not None:
-                self.log('Dumping index into archive ...')
-                zip_up_index(index_zip, index_path)
-                self.log('Done')
+            index_path = tempfile.mkdtemp()
+            yield index_path
         finally:
-            if index_zip is not None:
-                try:
-                    shutil.rmtree(index_path)
-                except (OSError, IOError):
-                    pass
+            if sys.exc_info()[2] is None:
+                zip_up_index(index_zip, index_path)
+            try:
+                shutil.rmtree(index_path)
+            except (OSError, IOError):
+                pass
+
+    def index_tree(self, index_path=None, index_zip=None):
+        with self._process(index_path, index_zip) as index_path:
+            index = get_index(index_path)
+            for section, path, config in self.iter_sources():
+                for evt in self.index_source(index, section, path, config):
+                    yield evt

@@ -1,7 +1,10 @@
-from flask import Blueprint, jsonify, request, current_app, abort
+from cStringIO import StringIO
+from flask import Blueprint, jsonify, request, current_app, abort, json, \
+     Response
 from werkzeug.security import safe_str_cmp
 
-from rigidsearch.search import get_index, put_index
+from rigidsearch.search import get_index, put_index, index_tree, \
+     get_index_path
 from rigidsearch.utils import cors
 
 
@@ -22,7 +25,29 @@ def search():
 
 @bp.route('/index', methods=['PUT'])
 def update_index():
-    if not safe_str_cmp(request.form.get('secret', ''), current_app.config['SEARCH_INDEX_SECRET']):
+    if not safe_str_cmp(request.form.get('secret', ''),
+                        current_app.config['SEARCH_INDEX_SECRET']):
         abort(403)
-    put_index(request.files['index'])
+    put_index(request.files['archive'])
     return jsonify(okay=True)
+
+
+@bp.route('/index/sources', methods=['PUT'])
+def process_zip_for_index():
+    if not safe_str_cmp(request.form.get('secret', ''),
+                        current_app.config['SEARCH_INDEX_SECRET']):
+        abort(403)
+
+    index_path = get_index_path()
+    config = json.load(request.files['config'])
+
+    f = request.files['archive']
+    archive = f.stream
+    f.stream = StringIO()
+
+    def generate():
+        for event in index_tree(config, from_zip=archive,
+                                index_path=index_path):
+            yield '%s\n' % event.encode('utf-8')
+    return Response(generate(), direct_passthrough=True,
+                    mimetype='text/plain')
