@@ -45,9 +45,7 @@ def make_schema():
     )
 
 
-def create_index_version(index_path=None, copy=False):
-    if index_path is None:
-        index_path = get_index_path()
+def create_index_version(index_path, copy=False):
     path = os.path.join(index_path, uuid.uuid4().hex)
     if copy:
         try:
@@ -95,7 +93,7 @@ def place_new_index(index_path, copy=True):
         new_idx = create_index_version(index_path, copy=copy)
         yield new_idx
     finally:
-        if sys.exc_info()[2] is not None:
+        if sys.exc_info()[2] is None:
             tmp_cur_idx = os.path.join(index_path, '.cur-' +
                                        os.path.basename(new_idx))
             os.symlink(os.path.basename(new_idx), tmp_cur_idx)
