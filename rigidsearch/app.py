@@ -33,7 +33,12 @@ def create_app(config_filename=None, config=None):
 
 
 def make_production_server(app, options):
+    import logging
     from gunicorn.app.base import Application
+
+    log_handler = logging.StreamHandler()
+    log_handler.setLevel(logging.WARNING)
+    app.logger.addHandler(log_handler)
 
     class RigidsearchServer(Application):
 
