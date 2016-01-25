@@ -1,0 +1,26 @@
+{
+  "configurations": [
+    {
+      "title_cleanup_regex": "^(.*?)\\s+-",
+      "ignore": [
+        "div.aside"
+      ],
+      "content_selectors": [
+        "section.document"
+      ],
+      "skip_docs": [
+        "bad"
+      ],
+      "sources": [
+        {
+          "path": "ver-a",
+          "section": "a"
+        },
+        {
+          "path": "ver-b",
+          "section": "b"
+        }
+      ]
+    }
+  ]
+}

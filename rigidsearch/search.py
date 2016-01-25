@@ -70,17 +70,22 @@ def get_index_path(index_path=None, app=None):
 
 def get_index(index_path=None, resolve_cur=True):
     schema = make_schema()
+
+    def _ensure_index(path):
+        try:
+            return index.open_dir(path)
+        except index.EmptyIndexError:
+            return index.create_in(path, schema)
+
     if not resolve_cur:
-        return Index(index_path, index.open_dir(index_path), schema)
+        return Index(index_path, _ensure_index(index_path), schema)
 
     cur_idx = os.path.join(index_path, 'cur')
 
-    if os.path.exists(cur_idx):
-        idx = index.open_dir(cur_idx)
-    else:
+    if not os.path.exists(cur_idx):
         real_idx = create_index_version(index_path)
         os.symlink(os.path.basename(real_idx), cur_idx)
-        idx = index.create_in(cur_idx, schema)
+    idx = _ensure_index(cur_idx)
     return Index(cur_idx, idx, schema)
 
 
@@ -117,11 +122,7 @@ def put_index(index_path, stream):
             zip.extractall(new_idx)
 
 
-def zip_up_index(stream, index_path=None, app=None):
-    index_path = get_index_path(index_path, app)
-    base_dir = os.path.join(
-        index_path, os.readlink(os.path.join(index_path, 'cur')))
-
+def zip_up_index(stream, base_dir):
     with zipfile.ZipFile(stream, 'w', zipfile.ZIP_DEFLATED) as zip:
         for dirpath, dirnames, filenames in os.walk(base_dir):
             for name in filenames:
@@ -132,9 +133,6 @@ def zip_up_index(stream, index_path=None, app=None):
 
 def index_tree(config, index_zip=None, base_dir=None, index_path=None,
                from_zip=None):
-    if len(filter(None, (index_zip, index_path))) != 1:
-        raise TypeError('Either index zip or index path must be passed')
-
     if from_zip is not None:
         source_tmp = tempfile.mkdtemp()
         with zipfile.ZipFile(from_zip, 'r') as zip:
@@ -348,6 +346,7 @@ class TreeIndexer(object):
             return
         try:
             index_path = tempfile.mkdtemp()
+            get_index(index_path, resolve_cur=False)
             yield index_path
         finally:
             if sys.exc_info()[2] is None:

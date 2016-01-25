@@ -23,6 +23,7 @@ setup(
     ],
     extras_require={
         'server': ['gunicorn', 'gevent'],
+        'test': ['pytest'],
     },
     classifiers=[
         'Environment :: Web Environment',

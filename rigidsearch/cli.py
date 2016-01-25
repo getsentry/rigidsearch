@@ -31,14 +31,16 @@ def cli(ctx, config):
 
 @cli.command('index-folder')
 @click.argument('config', type=click.File('rb'))
+@click.option('--index-path', type=click.Path(),
+              help='Where to write the index to other than config default.')
 @click.option('--save-zip', type=click.File('wb'),
               help='Optional a zip file the index should be stored at '
               'instead of modifying the index in-place.')
 @pass_ctx
-def index_folder_cmd(ctx, config, save_zip):
+def index_folder_cmd(ctx, config, index_path, save_zip):
     """Indexes a path."""
     from rigidsearch.search import index_tree, get_index_path
-    index_path = get_index_path(app=ctx.app)
+    index_path = get_index_path(index_path=index_path, app=ctx.app)
     for event in index_tree(json.load(config), index_zip=save_zip,
                             index_path=index_path):
         click.echo(event)
