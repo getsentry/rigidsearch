@@ -52,4 +52,5 @@ def process_zip_for_index():
                                 index_path=index_path):
             yield '%s\n' % event.encode('utf-8')
     return Response(generate(), direct_passthrough=True,
+                    headers={'X-Accel-Buffering': 'no'},
                     mimetype='text/plain')

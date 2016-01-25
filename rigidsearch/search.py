@@ -97,9 +97,8 @@ def place_new_index(index_path, copy=True):
         yield new_idx
     finally:
         if sys.exc_info()[2] is None:
-            tmp = cur_idx + '.' + uuid.uuid4().hex
-            os.symlink(os.path.basename(new_idx), tmp)
-            os.rename(tmp, cur_idx)
+            os.remove(cur_idx)
+            os.symlink(os.path.basename(new_idx), cur_idx)
             to_remove = index_name
         else:
             to_remove = new_idx
