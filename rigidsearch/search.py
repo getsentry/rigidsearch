@@ -261,9 +261,8 @@ class Index(object):
     def search(self, query, section=None, page=1, per_page=20):
         qp = QueryParser('content', self.schema)
         q = qp.parse(unicode(query))
-        filter = None
         if section is not None:
-            filter = Term('section', unicode(section))
+            q = And([q, Term('section', unicode(section))])
 
         def _make_item(hit):
             text = self.get_content(hit['path'], hit['section'])
@@ -279,8 +278,7 @@ class Index(object):
             }
 
         with self.whoosh_index.searcher() as searcher:
-            rv = searcher.search_page(q, page, filter=filter,
-                                      pagelen=per_page)
+            rv = searcher.search_page(q, page, pagelen=per_page)
             rv.results.formatter = make_html_formatter()
             rv.results.fragmenter = context_fragmenter
             return {
