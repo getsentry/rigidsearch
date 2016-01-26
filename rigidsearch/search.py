@@ -10,9 +10,11 @@ import tempfile
 from contextlib import contextmanager
 from whoosh import index
 from whoosh.fields import Schema, TEXT, ID, STORED
-from whoosh.qparser import QueryParser
+from whoosh.qparser import MultifieldParser
 from whoosh.query import Term, And
-from whoosh.highlight import HtmlFormatter, ContextFragmenter
+from whoosh.highlight import HtmlFormatter, ContextFragmenter, \
+     SentenceFragmenter
+from whoosh.analysis import StandardAnalyzer
 
 from flask import current_app
 
@@ -21,9 +23,18 @@ from rigidsearch.htmlprocessor import Processor
 from rigidsearch.fs import find_all_documents, file_changed
 
 
-context_fragmenter = ContextFragmenter(
-    maxchars=300
-)
+def make_fragmenter_and_analyzer(type=None, maxchars=None, surround=None):
+    type = type or 'context'
+    if type == 'context':
+        return ContextFragmenter(
+            maxchars=maxchars or 300,
+            surround=surround or 60,
+        ), None
+    elif type == 'sentence':
+        return SentenceFragmenter(
+            maxchars=maxchars or 300
+        ), StandardAnalyzer(stoplist=None)
+    return None, None
 
 
 def make_html_formatter():
@@ -180,7 +191,7 @@ class IndexTransaction(object):
         self._writer.add_document(
             path=path,
             title=parts['title'],
-            content=parts['text'],
+            content=parts['title'] + '\n\n' + parts['text'],
             section=unicode(section),
             checksum=unicode(h.hexdigest())
         )
@@ -258,8 +269,10 @@ class Index(object):
             if e.errno != errno.ENOENT:
                 raise
 
-    def search(self, query, section=None, page=1, per_page=20):
-        qp = QueryParser('content', self.schema)
+    def search(self, query, section=None, page=1, per_page=20,
+               excerpt_fragmenter=None, excerpt_maxchars=None,
+               excerpt_surround=None):
+        qp = MultifieldParser(['title', 'content'], self.schema)
         q = qp.parse(unicode(query))
         if section is not None:
             q = And([q, Term('section', unicode(section))])
@@ -279,8 +292,13 @@ class Index(object):
 
         with self.whoosh_index.searcher() as searcher:
             rv = searcher.search_page(q, page, pagelen=per_page)
+            frag, anal = make_fragmenter_and_analyzer(
+                excerpt_fragmenter, excerpt_maxchars, excerpt_surround)
             rv.results.formatter = make_html_formatter()
-            rv.results.fragmenter = context_fragmenter
+            if frag is not None:
+                rv.results.fragmenter = frag
+            if anal is not None:
+                rv.results.analyzer = anal
             return {
                 'items': [_make_item(x) for x in rv.results],
                 'pages': rv.pagecount,

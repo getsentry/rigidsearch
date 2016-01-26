@@ -16,11 +16,17 @@ def search():
     q = request.args.get('q') or u''
     page = request.args.get('page', type=int, default=1)
     per_page = request.args.get('per_page', type=int, default=20)
+    excerpt_fragmenter = request.args.get('excerpt_fragmenter')
+    excerpt_maxchars = request.args.get('excerpt_maxchars', type=int)
+    excerpt_surround = request.args.get('excerpt_surround', type=int)
     section = request.args.get('section') or 'generic'
 
     index_path = get_index_path()
     return jsonify(get_index(index_path).search(
-        q, section, page=page, per_page=per_page))
+        q, section, page=page, per_page=per_page,
+        excerpt_fragmenter=excerpt_fragmenter,
+        excerpt_maxchars=excerpt_maxchars,
+        excerpt_surround=excerpt_surround))
 
 
 @bp.route('/index', methods=['PUT'])
