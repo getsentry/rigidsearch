@@ -17,7 +17,7 @@ setup(
         'click>=6.0',
         'Flask',
         'whoosh',
-        'html5lib',
+        'html5lib<=0.9999999',
         'lxml',
         'cssselect',
     ],
