@@ -7,10 +7,10 @@
         "ul.breadcrumb"
       ],
       "content_selectors": [
-        "section.document",
+        "section.document"
       ],
       "content_sections": [
-        "div.section",
+        "div.section"
       ],
       "skip_docs": [
         "sitemap",
@@ -18,12 +18,8 @@
       ],
       "sources": [
         {
-          "path": "dirhtml/hosted",
+          "path": "docs",
           "section": "hosted"
-        },
-        {
-          "path": "dirhtml/on-premise",
-          "section": "on-premise"
         }
       ]
     }

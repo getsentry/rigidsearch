@@ -28,10 +28,13 @@ class Processor(object):
 
     def __init__(self, title_cleanup_regex=None,
                  content_selectors=None,
+                 content_sections=None,
                  ignore=None,
                  no_default_ignores=False):
         self.content_selectors = [compile_selector(sel) for sel in
                                   content_selectors or ('body',)]
+        self.content_sections = [compile_selector(sel) for sel in
+                                    content_sections or ('body',)]
         if title_cleanup_regex is not None:
             title_cleanup_regex = re.compile(title_cleanup_regex, re.UNICODE)
         self.title_cleanup_regex = title_cleanup_regex
@@ -45,6 +48,7 @@ class Processor(object):
         return cls(
             title_cleanup_regex=config.get('title_cleanup_regex'),
             content_selectors=config.get('content_selectors'),
+            content_sections=config.get('content_sections'),
             ignore=config.get('ignore'),
             no_default_ignores=config.get('no_default_ignores', False),
         )
@@ -57,12 +61,12 @@ class Processor(object):
                 return True
         return False
 
-    def process_document(self, document):
+    def process_document(self, document, path):
         if isinstance(document, basestring):
             document = StringIO(document)
         doc = html5lib.parse(document, treebuilder='lxml',
                              namespaceHTMLElements=False)
-        return self.process_tree(doc)
+        return self.process_tree(doc, path)
 
     def process_title_tag(self, title):
         if title is None:
@@ -95,8 +99,9 @@ class Processor(object):
 
         return u''.join(buf)
 
-    def process_tree(self, tree):
-        rv = {}
+    def process_tree(self, tree, path):
+        docs = []
+        doc = {}
 
         root = tree.getroot()
         head = root.find('head')
@@ -104,12 +109,24 @@ class Processor(object):
             raise ProcessingError('Document does not parse correctly.')
 
         title = head.find('title')
-        rv['title'] = self.process_title_tag(title)
+        doc['path'] = path
+        doc['title'] = self.process_title_tag(title)
 
         buf = []
         for sel in self.content_selectors:
             for el in sel(root):
                 buf.append(self.process_content_tag(el))
 
-        rv['text'] = u''.join(buf).rstrip()
-        return rv
+        doc['text'] = u''.join(buf).rstrip()
+        docs.append(doc)
+
+
+        for sel in self.content_sections:
+            for el in sel(root):
+                if el.attrib['id']:
+                    docs.append({
+                        'path': path + '#' + el.attrib['id'],
+                        'title': unicode(el.getchildren()[0].text),
+                        'text': unicode('hello'),
+                    })
+        return docs

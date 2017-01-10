@@ -186,23 +186,24 @@ class IndexTransaction(object):
                 buf.append(chunk)
             contents = ''.join(buf)
 
-        parts = processor.process_document(contents)
+        docs = processor.process_document(contents, path)
         self.remove_document(path, section)
-        self._writer.add_document(
-            path=path,
-            title=parts['title'],
-            content=parts['title'] + '\n\n' + parts['text'],
-            section=unicode(section),
-            checksum=unicode(h.hexdigest())
-        )
+        for doc in docs:
+            self._writer.add_document(
+                path=doc['path'],
+                title=doc['title'],
+                content=doc['title'] + '\n\n' + doc['text'],
+                section=unicode(section),
+                checksum=unicode(h.hexdigest())
+            )
 
-        content_fn = self._index.get_content_filename(path, section)
-        try:
-            os.makedirs(os.path.dirname(content_fn))
-        except OSError:
-            pass
-        with open(content_fn, 'wb') as f:
-            f.write(parts['text'].encode('utf-8'))
+            content_fn = self._index.get_content_filename(doc['path'], section)
+            try:
+                os.makedirs(os.path.dirname(content_fn))
+            except OSError:
+                pass
+            with open(content_fn, 'wb') as f:
+                f.write(doc['path'].encode('utf-8'))
 
     def remove_document(self, path, section='generic'):
         self._writer.delete_by_query(And([
