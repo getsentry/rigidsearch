@@ -203,7 +203,7 @@ class IndexTransaction(object):
             except OSError:
                 pass
             with open(content_fn, 'wb') as f:
-                f.write(doc['path'].encode('utf-8'))
+                f.write(doc['text'].encode('utf-8'))
 
     def remove_document(self, path, section='generic'):
         self._writer.delete_by_query(And([
@@ -279,6 +279,7 @@ class Index(object):
             q = And([q, Term('section', unicode(section))])
 
         def _make_item(hit):
+            print(hit)
             text = self.get_content(hit['path'], hit['section'])
             if text is not None:
                 excerpt = hit.highlights('content', text=text)

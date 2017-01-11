@@ -123,10 +123,11 @@ class Processor(object):
 
         for sel in self.content_sections:
             for el in sel(root):
+                # print self.process_content_tag(el)
                 if el.attrib['id']:
                     docs.append({
                         'path': path + '#' + el.attrib['id'],
                         'title': unicode(el.getchildren()[0].text),
-                        'text': unicode('hello'),
+                        'text': self.process_content_tag(el),
                     })
         return docs
