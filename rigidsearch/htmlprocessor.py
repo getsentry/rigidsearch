@@ -102,7 +102,8 @@ class Processor(object):
     def process_tree(self, tree, path):
         docs = []
         doc = {}
-
+        import pdb; pdb.set_trace()
+        
         root = tree.getroot()
         head = root.find('head')
         if head is None:
@@ -123,7 +124,6 @@ class Processor(object):
 
         for sel in self.content_sections:
             for el in sel(root):
-                # print self.process_content_tag(el)
                 if el.attrib['id']:
                     docs.append({
                         'path': path + '#' + el.attrib['id'],

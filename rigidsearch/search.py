@@ -8,7 +8,7 @@ import zipfile
 import hashlib
 import tempfile
 from contextlib import contextmanager
-from whoosh import index
+from whoosh import index, sorting
 from whoosh.fields import Schema, TEXT, ID, STORED
 from whoosh.qparser import MultifieldParser
 from whoosh.query import Term, And
@@ -48,8 +48,8 @@ def make_html_formatter():
 
 def make_schema():
     return Schema(
-        title=TEXT(stored=True),
-        path=ID(stored=True),
+        title=TEXT(stored=True,sortable=True),
+        path=ID(stored=True,sortable=True),
         section=ID(stored=True),
         checksum=STORED,
         content=TEXT
@@ -275,11 +275,12 @@ class Index(object):
                excerpt_surround=None):
         qp = MultifieldParser(['title', 'content'], self.schema)
         q = qp.parse(unicode(query))
+        facet = sorting.FieldFacet("path", reverse=True)
+
         if section is not None:
             q = And([q, Term('section', unicode(section))])
 
         def _make_item(hit):
-            print(hit)
             text = self.get_content(hit['path'], hit['section'])
             if text is not None:
                 excerpt = hit.highlights('content', text=text)
@@ -293,7 +294,7 @@ class Index(object):
             }
 
         with self.whoosh_index.searcher() as searcher:
-            rv = searcher.search_page(q, page, pagelen=per_page)
+            rv = searcher.search_page(q, page, sortedby=facet, pagelen=per_page)
             frag, anal = make_fragmenter_and_analyzer(
                 excerpt_fragmenter, excerpt_maxchars, excerpt_surround)
             rv.results.formatter = make_html_formatter()
