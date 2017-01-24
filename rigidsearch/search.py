@@ -281,7 +281,6 @@ class Index(object):
         mf = sorting.MultiFacet()
         mf.add_field("priority", reverse=True)
         mf.add_field("path", reverse=True)
-        # facet = sorting.FieldFacet("priority", reverse=True)
 
         if section is not None:
             q = And([q, Term('section', unicode(section))])
