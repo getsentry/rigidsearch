@@ -5,7 +5,7 @@ from lxml.cssselect import CSSSelector
 from html5lib.ihatexml import DataLossWarning
 from StringIO import StringIO
 
-
+from rigidsearch.utils import PRIORITY_VALUES
 # the ihatexml module emits data loss warnings.  This in our case is okay
 # because we are willing to accept the data loss that happens on the way
 # from HTML to XML as we never go in reverse direction.  In particular the
@@ -102,8 +102,7 @@ class Processor(object):
     def process_tree(self, tree, path):
         docs = []
         doc = {}
-        import pdb; pdb.set_trace()
-        
+
         root = tree.getroot()
         head = root.find('head')
         if head is None:
@@ -112,6 +111,14 @@ class Processor(object):
         title = head.find('title')
         doc['path'] = path
         doc['title'] = self.process_title_tag(title)
+
+
+        priority = str(path).split("/")[0]
+
+        if priority and priority in PRIORITY_VALUES.keys():
+            doc['priority'] = PRIORITY_VALUES[priority]
+        else:
+            doc['priority'] = 0
 
         buf = []
         for sel in self.content_selectors:
@@ -125,9 +132,16 @@ class Processor(object):
         for sel in self.content_sections:
             for el in sel(root):
                 if el.attrib['id']:
+                    p = str(path).split("/")[0]
+                    if p and p in PRIORITY_VALUES.keys():
+                        priority = PRIORITY_VALUES[p]
+                    else:
+                        priority = 0
+
                     docs.append({
                         'path': path + '#' + el.attrib['id'],
                         'title': unicode(el.getchildren()[0].text),
                         'text': self.process_content_tag(el),
+                        'priority': priority + 1
                     })
         return docs

@@ -7,6 +7,14 @@ from flask import make_response, current_app, request
 
 _ws_re = re.compile(r'(\s+)')
 
+PRIORITY_VALUES = { 'config': 2,
+                    'server': 4,
+                    'learn': 7,
+                    'clients': 6,
+                    'api': 4,
+                    'clientdev': 3,
+                    'integrations': 5
+                 }
 
 def chop_tail(base, tail):
     if not base.endswith(tail):

@@ -8,8 +8,8 @@ import zipfile
 import hashlib
 import tempfile
 from contextlib import contextmanager
-from whoosh import index, sorting
-from whoosh.fields import Schema, TEXT, ID, STORED
+from whoosh import index, sorting, columns
+from whoosh.fields import Schema, TEXT, ID, STORED, COLUMN
 from whoosh.qparser import MultifieldParser
 from whoosh.query import Term, And
 from whoosh.highlight import HtmlFormatter, ContextFragmenter, \
@@ -52,7 +52,8 @@ def make_schema():
         path=ID(stored=True,sortable=True),
         section=ID(stored=True),
         checksum=STORED,
-        content=TEXT
+        content=TEXT,
+        priority=COLUMN(columns.NumericColumn("i"))
     )
 
 
@@ -194,7 +195,8 @@ class IndexTransaction(object):
                 title=doc['title'],
                 content=doc['title'] + '\n\n' + doc['text'],
                 section=unicode(section),
-                checksum=unicode(h.hexdigest())
+                checksum=unicode(h.hexdigest()),
+                priority=doc['priority']
             )
 
             content_fn = self._index.get_content_filename(doc['path'], section)
@@ -247,7 +249,8 @@ class Index(object):
                     'path': fields['path'],
                     'title': fields['title'],
                     'section': fields['section'],
-                    'checksum': fields['checksum']
+                    'checksum': fields['checksum'],
+                    'priority': fields['priority']
                 }
 
     def get_content_filename(self, path, section):
@@ -275,7 +278,10 @@ class Index(object):
                excerpt_surround=None):
         qp = MultifieldParser(['title', 'content'], self.schema)
         q = qp.parse(unicode(query))
-        facet = sorting.FieldFacet("path", reverse=True)
+        mf = sorting.MultiFacet()
+        mf.add_field("priority", reverse=True)
+        mf.add_field("path", reverse=True)
+        # facet = sorting.FieldFacet("priority", reverse=True)
 
         if section is not None:
             q = And([q, Term('section', unicode(section))])
@@ -294,7 +300,7 @@ class Index(object):
             }
 
         with self.whoosh_index.searcher() as searcher:
-            rv = searcher.search_page(q, page, sortedby=facet, pagelen=per_page)
+            rv = searcher.search_page(q, page, sortedby=mf, pagelen=per_page)
             frag, anal = make_fragmenter_and_analyzer(
                 excerpt_fragmenter, excerpt_maxchars, excerpt_surround)
             rv.results.formatter = make_html_formatter()
