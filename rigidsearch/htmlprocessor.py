@@ -113,7 +113,6 @@ class Processor(object):
         title = head.find('title')
         doc['path'] = path
         doc['title'] = self.process_title_tag(title)
-
         priority = str(path).split("/")[0]
         if priority and priority in self.content_scoring:
             doc['priority'] = int(self.content_scoring[priority])
@@ -127,7 +126,6 @@ class Processor(object):
 
         doc['text'] = u''.join(buf).rstrip()
         docs.append(doc)
-
         for sel in self.content_sections:
             for el in sel(root):
                 if el.attrib['id']:
