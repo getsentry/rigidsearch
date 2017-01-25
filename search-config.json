@@ -12,6 +12,14 @@
       "content_sections": [
         "div.section"
       ],
+      "content_scoring": {
+        "config": "7",
+        "foo": "6",
+        "integrations": "5",
+        "api": "4",
+        "clientdev": "3",
+        "server": "2"
+      },
       "skip_docs": [
         "sitemap",
         "search"
