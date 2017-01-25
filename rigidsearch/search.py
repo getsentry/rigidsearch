@@ -48,8 +48,8 @@ def make_html_formatter():
 
 def make_schema():
     return Schema(
-        title=TEXT(stored=True,sortable=True),
-        path=ID(stored=True,sortable=True),
+        title=TEXT(stored=True, sortable=True),
+        path=ID(stored=True, sortable=True),
         section=ID(stored=True),
         checksum=STORED,
         content=TEXT,
