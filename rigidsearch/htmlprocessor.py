@@ -34,7 +34,7 @@ class Processor(object):
         self.content_selectors = [compile_selector(sel) for sel in
                                   content_selectors or ('body',)]
         self.content_sections = [compile_selector(sel) for sel in
-                                    content_sections or ('body',)]
+                                  content_sections or ('body',)]
         self.content_scoring = content_scoring
         if title_cleanup_regex is not None:
             title_cleanup_regex = re.compile(title_cleanup_regex, re.UNICODE)
