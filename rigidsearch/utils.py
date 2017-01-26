@@ -7,7 +7,6 @@ from flask import make_response, current_app, request
 
 _ws_re = re.compile(r'(\s+)')
 
-
 def chop_tail(base, tail):
     if not base.endswith(tail):
         return base, False

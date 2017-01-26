@@ -8,8 +8,8 @@ import zipfile
 import hashlib
 import tempfile
 from contextlib import contextmanager
-from whoosh import index
-from whoosh.fields import Schema, TEXT, ID, STORED
+from whoosh import index, sorting, columns
+from whoosh.fields import Schema, TEXT, ID, STORED, COLUMN
 from whoosh.qparser import MultifieldParser
 from whoosh.query import Term, And
 from whoosh.highlight import HtmlFormatter, ContextFragmenter, \
@@ -48,11 +48,12 @@ def make_html_formatter():
 
 def make_schema():
     return Schema(
-        title=TEXT(stored=True),
-        path=ID(stored=True),
+        title=TEXT(stored=True, sortable=True),
+        path=ID(stored=True, sortable=True),
         section=ID(stored=True),
         checksum=STORED,
-        content=TEXT
+        content=TEXT,
+        priority=COLUMN(columns.NumericColumn("i"))
     )
 
 
@@ -186,23 +187,25 @@ class IndexTransaction(object):
                 buf.append(chunk)
             contents = ''.join(buf)
 
-        parts = processor.process_document(contents)
+        docs = processor.process_document(contents, path)
         self.remove_document(path, section)
-        self._writer.add_document(
-            path=path,
-            title=parts['title'],
-            content=parts['title'] + '\n\n' + parts['text'],
-            section=unicode(section),
-            checksum=unicode(h.hexdigest())
-        )
+        for doc in docs:
+            self._writer.add_document(
+                path=doc['path'],
+                title=doc['title'],
+                content=doc['title'] + '\n\n' + doc['text'],
+                section=unicode(section),
+                checksum=unicode(h.hexdigest()),
+                priority=doc['priority']
+            )
 
-        content_fn = self._index.get_content_filename(path, section)
-        try:
-            os.makedirs(os.path.dirname(content_fn))
-        except OSError:
-            pass
-        with open(content_fn, 'wb') as f:
-            f.write(parts['text'].encode('utf-8'))
+            content_fn = self._index.get_content_filename(doc['path'], section)
+            try:
+                os.makedirs(os.path.dirname(content_fn))
+            except OSError:
+                pass
+            with open(content_fn, 'wb') as f:
+                f.write(doc['text'].encode('utf-8'))
 
     def remove_document(self, path, section='generic'):
         self._writer.delete_by_query(And([
@@ -246,7 +249,8 @@ class Index(object):
                     'path': fields['path'],
                     'title': fields['title'],
                     'section': fields['section'],
-                    'checksum': fields['checksum']
+                    'checksum': fields['checksum'],
+                    'priority': fields['priority']
                 }
 
     def get_content_filename(self, path, section):
@@ -274,6 +278,10 @@ class Index(object):
                excerpt_surround=None):
         qp = MultifieldParser(['title', 'content'], self.schema)
         q = qp.parse(unicode(query))
+        mf = sorting.MultiFacet()
+        mf.add_field("priority", reverse=True)
+        mf.add_field("path", reverse=True)
+
         if section is not None:
             q = And([q, Term('section', unicode(section))])
 
@@ -291,7 +299,7 @@ class Index(object):
             }
 
         with self.whoosh_index.searcher() as searcher:
-            rv = searcher.search_page(q, page, pagelen=per_page)
+            rv = searcher.search_page(q, page, sortedby=mf, pagelen=per_page)
             frag, anal = make_fragmenter_and_analyzer(
                 excerpt_fragmenter, excerpt_maxchars, excerpt_surround)
             rv.results.formatter = make_html_formatter()

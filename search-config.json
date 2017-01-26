@@ -7,15 +7,15 @@
         "ul.breadcrumb"
       ],
       "content_selectors": [
-        "section.document",
+        "section.document"
       ],
       "content_sections": [
-        "div.section",
+        "div.section"
       ],
       "content_scoring": {
-        "learn": "6",
-        "clients": "6",
-        "integrations": "6",
+        "config": "7",
+        "foo": "6",
+        "integrations": "5",
         "api": "4",
         "clientdev": "3",
         "server": "2"
@@ -26,12 +26,8 @@
       ],
       "sources": [
         {
-          "path": "dirhtml/hosted",
+          "path": "docs",
           "section": "hosted"
-        },
-        {
-          "path": "dirhtml/on-premise",
-          "section": "on-premise"
         }
       ]
     }
