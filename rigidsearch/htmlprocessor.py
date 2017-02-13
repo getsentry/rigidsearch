@@ -126,18 +126,19 @@ class Processor(object):
 
         doc['text'] = u''.join(buf).rstrip()
         docs.append(doc)
+
         for sel in self.content_sections:
             for el in sel(root):
-                if el.attrib['id']:
+                if el.attrib['id'] and el.attrib['id'] not in path:
                     p = str(path).split("/")[0]
                     if p and p in self.content_scoring:
                         priority = int(self.content_scoring[p])
                     else:
                         priority = 0
-
+                    title = [w.capitalize() for w in el.attrib['id'].split("-")]
                     docs.append({
-                        'path': path + '#' + el.attrib['id'],
-                        'title': unicode(el.getchildren()[0].text),
+                        'path': path + "#" + el.attrib['id'],
+                        'title': u' '.join(title)),
                         'text': self.process_content_tag(el),
                         'priority': priority + 1
                     })

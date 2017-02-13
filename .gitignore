@@ -7,4 +7,5 @@ build
 dist
 venv
 docs
-search-config.json
+sentry-config.json
+htmls

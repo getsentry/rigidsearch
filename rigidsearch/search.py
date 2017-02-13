@@ -280,7 +280,6 @@ class Index(object):
         q = qp.parse(unicode(query))
         mf = sorting.MultiFacet()
         mf.add_field("priority", reverse=True)
-        mf.add_field("path", reverse=True)
 
         if section is not None:
             q = And([q, Term('section', unicode(section))])
