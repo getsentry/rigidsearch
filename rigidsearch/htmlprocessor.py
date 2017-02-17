@@ -138,7 +138,7 @@ class Processor(object):
                     title = [w.capitalize() for w in el.attrib['id'].split("-")]
                     docs.append({
                         'path': path + "#" + el.attrib['id'],
-                        'title': u' '.join(title)),
+                        'title': u' '.join(title),
                         'text': self.process_content_tag(el),
                         'priority': priority + 1
                     })
