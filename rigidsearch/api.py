@@ -1,3 +1,5 @@
+import shutil
+import os
 from flask import Blueprint, jsonify, request, current_app, abort, json, \
      Response
 from werkzeug.security import safe_str_cmp
@@ -57,3 +59,21 @@ def process_zip_for_index():
     return Response(generate(), direct_passthrough=True,
                     headers={'X-Accel-Buffering': 'no'},
                     mimetype='text/plain')
+
+@bp.route('/index', methods=['DELETE'])
+def delete_index():
+    if not safe_str_cmp(request.form.get('secret', ''),
+                        current_app.config['SEARCH_INDEX_SECRET']):
+        abort(403)
+
+    index_path = get_index_path()
+    if index_path is not None:
+        try:
+            shutil.rmtree(index_path)
+        except (OSError, IOError):
+            pass
+    deleted = not os.path.isdir(index_path)
+    if deleted:
+        return Response(status=204)
+    else:
+        return Response(status=500)
