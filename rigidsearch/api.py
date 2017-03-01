@@ -62,11 +62,18 @@ def process_zip_for_index():
 
 @bp.route('/index', methods=['DELETE'])
 def delete_index():
-    path = get_index_path()
-    if path is not None:
+    if not safe_str_cmp(request.form.get('secret', ''),
+                        current_app.config['SEARCH_INDEX_SECRET']):
+        abort(403)
+
+    index_path = get_index_path()
+    if index_path is not None:
         try:
-            shutil.rmtree(path)
+            shutil.rmtree(index_path)
         except (OSError, IOError):
             pass
-    status = False if os.path.isdir(path) else True
-    return jsonify(deleted=status)
+    deleted = not os.path.isdir(index_path)
+    if deleted:
+        return Response(status=204)
+    else:
+        return Response(status=500)
