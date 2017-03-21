@@ -20,6 +20,8 @@ setup(
         'html5lib<=0.9999999',
         'lxml',
         'cssselect',
+        'raven',
+        'blinker',
     ],
     extras_require={
         'server': ['gunicorn', 'gevent'],
