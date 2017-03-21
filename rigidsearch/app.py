@@ -1,5 +1,6 @@
 import os
 from flask import Flask
+from raven.contrib.flask import Sentry
 
 
 env_config = [
@@ -7,6 +8,7 @@ env_config = [
     ('SEARCH_INDEX_SECRET', 'supersecretnotreallythough'),
 ]
 
+sentry = Sentry()
 
 def prime_config(config):
     for key, default in env_config:
@@ -19,6 +21,7 @@ def prime_config(config):
 
 def create_app(config_filename=None, config=None):
     app = Flask(__name__.split('.')[0])
+    sentry.init_app(app)
     prime_config(app.config)
 
     if config:
