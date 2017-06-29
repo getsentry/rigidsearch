@@ -48,9 +48,16 @@ def process_zip_for_index():
         abort(403)
 
     index_path = get_index_path()
+
     config = json.load(request.files['config'])
 
     archive = release_file(request, 'archive')
+
+    if os.path.isdir(index_path):
+        try:
+            shutil.rmtree(index_path)
+        except (OSError, IOError):
+            pass
 
     def generate():
         for event in index_tree(config, from_zip=archive,
