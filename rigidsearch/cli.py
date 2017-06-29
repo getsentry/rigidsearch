@@ -42,11 +42,6 @@ def index_folder_cmd(ctx, config, index_path, save_zip):
     """Indexes a path."""
     from rigidsearch.search import index_tree, get_index_path
     index_path = get_index_path(index_path=index_path, app=ctx.app)
-    if os.path.isdir(index_path):
-        try:
-            shutil.rmtree(index_path)
-        except (OSError, IOError):
-            pass
     for event in index_tree(json.load(config), index_zip=save_zip,
                             index_path=index_path):
         click.echo(event)
