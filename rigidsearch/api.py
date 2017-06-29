@@ -53,6 +53,12 @@ def process_zip_for_index():
 
     archive = release_file(request, 'archive')
 
+    if os.path.isdir(index_path):
+        try:
+            shutil.rmtree(index_path)
+        except (OSError, IOError):
+            pass
+
     def generate():
         for event in index_tree(config, from_zip=archive,
                                 index_path=index_path):
