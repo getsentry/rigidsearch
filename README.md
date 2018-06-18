@@ -11,7 +11,7 @@ To run rigidsearch locally:
 `rigidsearch devserver`
 
 
-##### RigidSearch + Sentry Docs
+### RigidSearch + Sentry Docs
 If you want to test searching on the sentry docs content, you need to send that content to your local rigidsearch server.
 1. Have your rigidsearch server running (`rigidsearch devserver`)
 2. In sentry-docs export the **RIGIDSEARCH_SERVER** and **RIGIDSEARCH_SECRET**
